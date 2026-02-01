@@ -11,6 +11,7 @@ COPY src/ ./src/
 
 # 環境変数
 ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
 
 # ポート設定
 EXPOSE 8080
