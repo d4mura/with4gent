@@ -89,6 +89,15 @@ class TestOpenAIService:
         call_args = mock_client.responses.create.call_args
         assert call_args.kwargs["previous_response_id"] == "prev_id"
 
+    def test_clear_session(self):
+        from src.services.openai_service import OpenAIService
+
+        with patch("src.services.openai_service.OpenAI"):
+            service = OpenAIService("fake_key")
+            service.previous_responses["user_123"] = "prev_id"
+            service.clear_session("user_123")
+            assert "user_123" not in service.previous_responses
+
 
 class TestLineService:
     """LineServiceのテスト"""
@@ -116,6 +125,26 @@ class TestLineService:
         service.mark_as_read("read_token")
 
         mock_api.mark_messages_as_read_by_token.assert_called_once()
+
+    @patch("src.services.line_service.ApiClient")
+    @patch("src.services.line_service.MessagingApi")
+    def test_leave_group(self, mock_msg_api_class, mock_api_client_class):
+        from src.services.line_service import LineService
+
+        mock_api = mock_msg_api_class.return_value
+        service = LineService("fake_token")
+        service.leave_group("group_123")
+        mock_api.leave_group.assert_called_with("group_123")
+
+    @patch("src.services.line_service.ApiClient")
+    @patch("src.services.line_service.MessagingApi")
+    def test_leave_room(self, mock_msg_api_class, mock_api_client_class):
+        from src.services.line_service import LineService
+
+        mock_api = mock_msg_api_class.return_value
+        service = LineService("fake_token")
+        service.leave_room("room_123")
+        mock_api.leave_room.assert_called_with("room_123")
 
 
 if __name__ == "__main__":
