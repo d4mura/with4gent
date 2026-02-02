@@ -2,160 +2,154 @@
 Tests for with4gent LINE Bot
 """
 
-import pytest
-from unittest.mock import Mock, patch, MagicMock
-import sys
 import os
+import sys
+from unittest.mock import Mock, patch
+
+import pytest
 
 # srcディレクトリをパスに追加
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+
+# 環境変数のモックを先に行う
+@pytest.fixture(autouse=True)
+def mock_env():
+    with patch.dict(
+        os.environ,
+        {
+            "LINE_CHANNEL_ACCESS_TOKEN": "test_token",
+            "LINE_CHANNEL_SECRET": "test_secret",
+            "OPENAI_API_KEY": "test_key",
+        },
+    ):
+        yield
 
 
 class TestHealthEndpoint:
     """ヘルスチェックエンドポイントのテスト"""
-    
+
     def test_health_returns_ok(self):
         """ヘルスチェックが正常に動作する"""
-        with patch.dict(os.environ, {
-            'LINE_CHANNEL_ACCESS_TOKEN': 'test_token',
-            'LINE_CHANNEL_SECRET': 'test_secret',
-            'OPENAI_API_KEY': 'test_key'
-        }):
-            from main import app
-            
-            client = app.test_client()
-            response = client.get('/health')
-            
-            assert response.status_code == 200
-            assert response.json == {'status': 'ok'}
+        from src.main import app
+
+        client = app.test_client()
+        response = client.get("/health")
+        assert response.status_code == 200
+        assert response.json == {"status": "ok"}
 
 
 class TestWebhookEndpoint:
     """Webhookエンドポイントのテスト"""
-    
+
     def test_webhook_missing_signature_returns_400(self):
         """署名がない場合は400を返す"""
-        with patch.dict(os.environ, {
-            'LINE_CHANNEL_ACCESS_TOKEN': 'test_token',
-            'LINE_CHANNEL_SECRET': 'test_secret',
-            'OPENAI_API_KEY': 'test_key'
-        }):
-            from main import app
-            
-            client = app.test_client()
-            response = client.post('/webhook', data='{}')
-            
-            assert response.status_code == 400
+        from src.main import app
+
+        client = app.test_client()
+        response = client.post("/webhook", data="{}")
+        assert response.status_code == 400
 
 
-class TestGetOpenAIResponse:
-    """OpenAIレスポンス取得のテスト"""
-    
-    @patch('main.openai_client')
-    def test_new_user_creates_new_conversation(self, mock_openai):
-        """新規ユーザーの場合は新しい会話を作成する"""
-        with patch.dict(os.environ, {
-            'LINE_CHANNEL_ACCESS_TOKEN': 'test_token',
-            'LINE_CHANNEL_SECRET': 'test_secret',
-            'OPENAI_API_KEY': 'test_key'
-        }):
-            # モックの設定
-            mock_response = Mock()
-            mock_response.id = 'resp_123'
-            mock_response.output_text = 'Hello!'
-            mock_openai.responses.create.return_value = mock_response
-            
-            from main import get_openai_response, previous_responses
-            
-            # テスト前にクリア
-            previous_responses.clear()
-            
-            result = get_openai_response('user_123', 'こんにちは')
-            
-            assert result == 'Hello!'
-            assert 'user_123' in previous_responses
-            assert previous_responses['user_123'] == 'resp_123'
-    
-    @patch('main.openai_client')
-    def test_existing_user_continues_conversation(self, mock_openai):
-        """既存ユーザーの場合は会話を継続する"""
-        with patch.dict(os.environ, {
-            'LINE_CHANNEL_ACCESS_TOKEN': 'test_token',
-            'LINE_CHANNEL_SECRET': 'test_secret',
-            'OPENAI_API_KEY': 'test_key'
-        }):
-            mock_response = Mock()
-            mock_response.id = 'resp_456'
-            mock_response.output_text = 'Nice to meet you!'
-            mock_openai.responses.create.return_value = mock_response
-            
-            from main import get_openai_response, previous_responses
-            
-            # 既存の会話を設定
-            previous_responses['user_456'] = 'resp_previous'
-            
-            result = get_openai_response('user_456', '私の名前は？')
-            
-            assert result == 'Nice to meet you!'
-            # previous_response_idが使われたことを確認
-            call_kwargs = mock_openai.responses.create.call_args.kwargs
-            assert call_kwargs.get('previous_response_id') == 'resp_previous'
-    
-    @patch('main.openai_client')
-    def test_api_error_returns_error_message(self, mock_openai):
-        """APIエラー時はエラーメッセージを返す"""
-        with patch.dict(os.environ, {
-            'LINE_CHANNEL_ACCESS_TOKEN': 'test_token',
-            'LINE_CHANNEL_SECRET': 'test_secret',
-            'OPENAI_API_KEY': 'test_key'
-        }):
-            mock_openai.responses.create.side_effect = Exception('API Error')
-            
-            from main import get_openai_response, previous_responses
-            
-            previous_responses.clear()
-            result = get_openai_response('user_789', 'test')
-            
-            assert 'エラーが発生しました' in result
+class TestOpenAIService:
+    """OpenAIServiceのテスト"""
+
+    @patch("src.services.openai_service.OpenAI")
+    def test_get_response_new_session(self, mock_openai_class):
+        from src.services.openai_service import OpenAIService
+
+        mock_client = mock_openai_class.return_value
+        mock_response = Mock()
+        mock_response.id = "resp_123"
+        mock_response.output_text = "Hello!"
+        mock_client.responses.create.return_value = mock_response
+
+        service = OpenAIService("fake_key")
+        result = service.get_response("user_123", "Hi")
+
+        assert result == "Hello!"
+        assert service.previous_responses["user_123"] == "resp_123"
+        mock_client.responses.create.assert_called_once()
+
+    @patch("src.services.openai_service.OpenAI")
+    def test_get_response_existing_session(self, mock_openai_class):
+        from src.services.openai_service import OpenAIService
+
+        mock_client = mock_openai_class.return_value
+        mock_response = Mock()
+        mock_response.id = "resp_456"
+        mock_response.output_text = "World!"
+        mock_client.responses.create.return_value = mock_response
+
+        service = OpenAIService("fake_key")
+        service.previous_responses["user_123"] = "prev_id"
+        result = service.get_response("user_123", "Hello")
+
+        assert result == "World!"
+        call_args = mock_client.responses.create.call_args
+        assert call_args.kwargs["previous_response_id"] == "prev_id"
+
+    def test_clear_session(self):
+        from src.services.openai_service import OpenAIService
+
+        with patch("src.services.openai_service.OpenAI"):
+            service = OpenAIService("fake_key")
+            service.previous_responses["user_123"] = "prev_id"
+            service.clear_session("user_123")
+            assert "user_123" not in service.previous_responses
 
 
-class TestMarkAsRead:
-    """既読機能のテスト"""
-    
-    def test_mark_as_read_with_valid_token(self):
-        """有効なトークンで既読処理が実行される"""
-        with patch.dict(os.environ, {
-            'LINE_CHANNEL_ACCESS_TOKEN': 'test_token',
-            'LINE_CHANNEL_SECRET': 'test_secret',
-            'OPENAI_API_KEY': 'test_key'
-        }):
-            from main import mark_as_read
-            
-            mock_api_client = MagicMock()
-            mock_messaging_api = MagicMock()
-            
-            with patch('main.MessagingApi', return_value=mock_messaging_api):
-                mark_as_read(mock_api_client, 'valid_token')
-                
-                mock_messaging_api.mark_messages_as_read_by_token.assert_called_once()
-    
-    def test_mark_as_read_with_none_token(self):
-        """トークンがNoneの場合は何もしない"""
-        with patch.dict(os.environ, {
-            'LINE_CHANNEL_ACCESS_TOKEN': 'test_token',
-            'LINE_CHANNEL_SECRET': 'test_secret',
-            'OPENAI_API_KEY': 'test_key'
-        }):
-            from main import mark_as_read
-            
-            mock_api_client = MagicMock()
-            
-            with patch('main.MessagingApi') as mock_class:
-                mark_as_read(mock_api_client, None)
-                
-                # MessagingApiが呼ばれていないことを確認
-                mock_class.assert_not_called()
+class TestLineService:
+    """LineServiceのテスト"""
+
+    @patch("src.services.line_service.ApiClient")
+    @patch("src.services.line_service.MessagingApi")
+    def test_reply_message(self, mock_msg_api_class, mock_api_client_class):
+        from src.services.line_service import LineService
+
+        mock_api = mock_msg_api_class.return_value
+
+        service = LineService("fake_token")
+        service.reply_message("token", "hello")
+
+        mock_api.reply_message_with_http_info.assert_called_once()
+
+    @patch("src.services.line_service.ApiClient")
+    @patch("src.services.line_service.MessagingApi")
+    def test_mark_as_read(self, mock_msg_api_class, mock_api_client_class):
+        from src.services.line_service import LineService
+
+        mock_api = mock_msg_api_class.return_value
+
+        service = LineService("fake_token")
+        service.mark_as_read("read_token")
+
+        mock_api.mark_messages_as_read_by_token.assert_called_once()
+
+    @patch("src.services.line_service.ApiClient")
+    @patch("src.services.line_service.MessagingApi")
+    def test_leave_group(self, mock_msg_api_class, mock_api_client_class):
+        from src.services.line_service import LineService
+
+        mock_api = mock_msg_api_class.return_value
+        service = LineService("fake_token")
+        service.leave_group("group_123")
+        mock_api.leave_group.assert_called_with("group_123")
+
+    @patch("src.services.line_service.ApiClient")
+    @patch("src.services.line_service.MessagingApi")
+    def test_leave_room(self, mock_msg_api_class, mock_api_client_class):
+        from src.services.line_service import LineService
+
+        mock_api = mock_msg_api_class.return_value
+        service = LineService("fake_token")
+        service.leave_room("room_123")
+        mock_api.leave_room.assert_called_with("room_123")
 
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
