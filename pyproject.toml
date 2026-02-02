@@ -11,5 +11,27 @@ dependencies = [
     "openai==2.16.0",
     "pytest==9.0.2",
     "python-dotenv==1.2.1",
+    "ruff==0.14.14",
     "uvicorn>=0.40.0",
 ]
+
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C",  # flake8-comprehensions
+    "B",  # flake8-bugbear
+]
+ignore = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"

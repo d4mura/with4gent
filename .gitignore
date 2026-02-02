@@ -34,3 +34,6 @@ Thumbs.db
 
 # UV
 uv.lock
+
+# Lint
+/.output.txt
