@@ -8,7 +8,7 @@ with4gentは、LINE Messaging APIとOpenAI Responses APIを統合したチャッ
 
 ## 機能
 
-- **AIチャット**: OpenAI GPT-4o-miniによる自然な会話
+- **AIチャット**: OpenAI GPT-4o-mini による自然な会話
 - **Web検索**: 最新情報が必要な質問には自動でWeb検索を実行
 - **会話の継続**: ユーザーごとに会話履歴を保持し、文脈を理解した応答
 - **既読機能**: メッセージ受信時に自動で既読をつける
