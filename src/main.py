@@ -6,7 +6,7 @@ Version: 2.1.0
 from flask import Flask, abort, request
 from linebot.v3 import WebhookHandler
 from linebot.v3.exceptions import InvalidSignatureError
-from linebot.v3.webhooks import MessageEvent, TextMessageContent
+from linebot.v3.webhooks import JoinEvent, MessageEvent, TextMessageContent
 
 from src.config import config
 from src.logic import ChatbotLogic
@@ -47,6 +47,12 @@ def webhook():
 def handle_message(event):
     """テキストメッセージを処理"""
     chatbot_logic.process_event(event)
+
+
+@handler.add(JoinEvent)
+def handle_join(event):
+    """グループ/ルーム参加イベントを処理"""
+    chatbot_logic.handle_join(event)
 
 
 if __name__ == "__main__":
