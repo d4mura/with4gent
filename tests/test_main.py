@@ -104,15 +104,22 @@ class TestLineService:
 
     @patch("src.services.line_service.ApiClient")
     @patch("src.services.line_service.MessagingApi")
-    def test_reply_message(self, mock_msg_api_class, mock_api_client_class):
+    def test_reply_message_line_split(self, mock_msg_api_class, mock_api_client_class):
         from src.services.line_service import LineService
 
         mock_api = mock_msg_api_class.return_value
 
         service = LineService("fake_token")
-        service.reply_message("token", "hello")
+        # 160文字を超えるメッセージのテスト
+        long_text = "あ" * 170
+        service.reply_message("token", long_text)
 
-        mock_api.reply_message_with_http_info.assert_called_once()
+        # 160文字で分割されて送信されることを確認
+        call_args = mock_api.reply_message_with_http_info.call_args
+        messages = call_args[0][0].messages
+        assert len(messages) == 2
+        assert len(messages[0].text) == 160
+        assert len(messages[1].text) == 10
 
     @patch("src.services.line_service.ApiClient")
     @patch("src.services.line_service.MessagingApi")

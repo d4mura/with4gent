@@ -37,3 +37,7 @@ uv.lock
 
 # Lint
 /.output.txt
+
+# MCP
+.ai/
+.mcp.json
